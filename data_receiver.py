@@ -18,6 +18,6 @@ class Receiver:
         request, addr = sock.accept()
         return request.makefile('r')
 
-r = Receiver()
-for line in r.receive():
-    print(line)
+# r = Receiver()
+# for line in r.receive():
+#     print(line)
