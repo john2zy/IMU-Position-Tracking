@@ -1,33 +1,39 @@
 # To add a new cell, type '# %%'
 # To add a new markdown cell, type '# %% [markdown]'
 # %%
-from IPython import get_ipython
-
-# %%
 import numpy as np
 import numpy.linalg
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-import data_receiver
 
 
 # %%
-# get_ipython().run_line_magic('matplotlib', 'widget')
+# %matplotlib widget
 
-# %% [markdown]
-# # define constants
+
+# %%
+import data_receiver
+from mathlib import *
+
 
 # %%
 # sampling rate
-DT = 0.01 # s
-
+DT = 0.05    # s
+setDT(DT)
 # the initialization interval
-ts = 0.5 # s
+ts = 0.5    # s
 
 # initial error estimation
-sigma_P = 0.0003 # initial angular error
-sigma_Q = 0.00003 # discrete time error
-sigma_R = 0.025 # measurement noise
+sigma_P = 0.001    # initial angular error
+sigma_Q = 0.001   # discrete time error
+sigma_aR = 0.2    # measurement noise of acc
+sigma_mR = 0.5    # measurement noise of mag
+
+P = sigma_P * I(3)
+Q = sigma_Q * I(3)
+# aR = sigma_aR * I(3)
+# mR = sigma_aR * I(3)
+R0 = np.diag((sigma_aR, sigma_aR, sigma_aR, sigma_mR, sigma_mR, sigma_mR))
 
 # %% [markdown]
 # # data processing
@@ -50,7 +56,7 @@ a = data[5:-5, 3:6]
 m = data[5:-5, 6:9]
 
 if(np.shape(w)[0] < ts/DT):
-    print("not enough data!")
+    print("not enough data for intialization!")
 
 # %% [markdown]
 # ## Initialization
@@ -58,13 +64,18 @@ if(np.shape(w)[0] < ts/DT):
 # %%
 w_bias = w[:int(ts/DT)].mean(axis = 0)
 
-g_avg = a[:int(ts/DT)].mean(axis = 0)
-g_dir = - g_avg / np.linalg.norm(g_avg)
-g_dir = np.array([g_dir]).T
+gn = a[:int(ts/DT)].mean(axis = 0)
+gn = -np.array([gn]).T
+
+mn = m[:int(ts/DT)].mean(axis = 0)
+mn = mn / np.linalg.norm(mn)
+mn = np.array([mn]).T
 
 # cut the initialization data
-w = w[int(ts/DT):] - w_bias
+w = w[int(ts/DT) - 1:] - w_bias
+# w = w[int(ts/DT):]
 a = a[int(ts/DT):]
+m = m[int(ts/DT):]
 
 
 # %%
@@ -88,147 +99,83 @@ ax = g_fig.add_subplot(111, projection='3d')
 
 ax.set_xlim(-1.5, 1.5)
 ax.set_ylim(-1.5, 1.5)
-ax.set_zlim(-1.5, 1.5)
+# ax.set_zlim(-1.5, 1.5)
 ax.set_xlabel('X axis')
 ax.set_ylabel('Y axis')
 ax.set_zlabel('Z axis')
-ax.plot(g_dir[0], g_dir[1], g_dir[2], 'o')
+ax.plot(gn[0], gn[1], gn[2], 'o')
+ax.plot(mn[0], mn[1], mn[2], 'o')
 ax.plot([0], [0], [0], 'ro')
 
-print(g_dir.T)
-
-
-# %%
-I3 = np.diag((1, 1, 1))
-
-def skew(x):
-    '''
-        takes in a 3d column vector
-        returns its skew-symmetric matrix
-    '''
-
-    x = x.T[0]
-    return np.array([
-        [0, -x[2], x[1]],
-        [x[2], 0, -x[0]],
-        [-x[1], x[0], 0]
-    ])
-
-def Omega(x):
-    '''returns the Omega matrix defined in the paper'''
-
-    l = np.vstack((-skew(x), -x.T))
-    zero = np.array([0])
-    r = np.vstack((x, zero))
-    return np.hstack((l, r))
-
-def C(q):
-    qv = q[0:3, :]
-    qc = q[3, :]
-
-    tmp1 = (qc**2 - qv.T @ qv) * I3
-    tmp2 = - 2 * qc * skew(qv)
-    tmp3 = 2 * qv @ qv.T
-    return tmp1 + tmp2 + tmp3
-
-def S(q):
-    '''returns the S matrix defined in the paper'''
-
-    qv = q[0:3, :]
-    qc = q[3, :]
-
-    tmp = qc * I3 + skew(qv)
-    return np.vstack((tmp, -qv.T))
-
-def Fk(w):
-    '''state transfer matrix, w is the measured angular velocity'''
-
-    I4 = np.diag((1, 1, 1, 1))
-    w_norm = np.linalg.norm(w)
-
-    # the rotation angle
-    beta = w_norm * (DT/2)
-
-    return I4 * np.cos(beta) + Omega(w) * (np.sin(beta) / w_norm)
+print(gn.T)
 
 # %% [markdown]
 # ## Kalman Filter
 
 # %%
-q = np.array([[0. ,0., 0., 1.]]).T
-P = sigma_P * I3
-Q = sigma_Q * DT * I3
-R = sigma_R * I3
+g = []
+orientation = []
+qs = []
+
+q = np.array([[1, 0, 0, 0]]).T
+
+t = 0
+while(t < np.shape(a)[0]):
+    wt_1 = np.array([w[t]]).T  # w_t-1
+    at = np.array([a[t]]).T
+    mt = np.array([m[t]]).T
+
+    # time update
+    q = quad_mul(q, exp_q(0.5 * DT * wt_1))  # q_(t|t-1)
+
+    Rtt_1 = R(q)  # R_(t|t-1)
+    P = P + (DT * Rtt_1) @ Q @ (DT * Rtt_1).T  # P_(t|t-1)
+
+    # measurement update
+    Ht = Hessian(q, gn, mn)
+    St = Ht @ P @ Ht.T + R0
+    Kt = P @ Ht.T @ np.linalg.inv(St)
+    Epsilon_t = np.vstack((at, mt)) - np.vstack((-Rtt_1 @ gn, Rtt_1 @ mn))
+
+    Eta_t = Kt @ Epsilon_t  # Eta_t
+    P = P - Kt @ St @ Kt.T  # P_(t|t)
+
+    # Relinearize
+    q = quad_mul(exp_q(0.5 * Eta_t), q)
+    q = q / np.linalg.norm(q)
+
+    # qs.append(q[1:4, :].T[0])
+    g.append((R(q) @ gn).T[0])
+    t += 1
+
+g = np.array(g)
+qs = np.array(qs)
 
 
 # %%
-k = 0
-points = []
-g = []
+q = np.array([[0, 0, 0, 1]]).T
+p = np.array([[1, 0, 0]]).T
 
-while k < np.shape(w)[0]:
-    wk = np.array([w[k]]).T
-
-    # update orientation q
-    q = Fk(wk) @ q
-    # normalize q to minimize error
-    q = q / np.linalg.norm(q)  
-
-    # estimate covarience matrix
-    Phi = I3 - skew(wk) * DT
-    P = Phi @ P @ Phi.T + Q
-
-    # update gravity direction
-    g_dir = C(q) @ g_dir
-
-    # calculate Kalman gain
-    H = skew(g_dir)
-    tmp = H @ P @ H.T + R
-    K = P @ H.T @ np.linalg.inv(tmp)
-
-    # get gravity measurement from raw a data
-    # lowpass filter
-    # wc = 0.4 # rad/s
-
-
-    # delta_theta = K @ (m_g_dir - g_dir)
-
-    # update q
-    # q = q + S(q) @ (delta_theta / 2)
-    # # normalize q
-    # q = q / np.linalg.norm(q)
-
-    # update P
-    P = (I3 - K @ H) @ P @ (I3 - K @ H).T + K @ R @ K.T
-
-    # should we normalize q's vector part?
-    # does the vector part represent orientation?
-    points.append(q[0:3, :].T[0] / np.linalg.norm(q[0:3, :].T[0]))
-    # points.append(q[0:3, :].T[0])
-    g.append(g_dir.T[0])
-    k += 1
-
-points = np.array(points)
-g = np.array(g)
+R(q) @ p
 
 # %% [markdown]
 # ### plotting results
 
 # %%
 plt.subplot(311)
-plt.plot(g[:, 0], label='gx')
+plt.plot(g[:, 0], 'r-', label='gx')
 plt.legend()
-plt.ylim(-1, 1)
+plt.ylim(-12, 12)
 
 plt.subplot(312)
-plt.plot(g[:, 1], label='gy')
+plt.plot(g[:, 1], 'g-', label='gy')
 plt.legend()
-plt.ylim(-1, 1)
+plt.ylim(-12, 12)
 
 plt.subplot(313)
-plt.plot(g[:, 2], label='gz')
+plt.plot(g[:, 2], 'b-', label='gz')
 plt.legend()
-plt.ylim(-1, 1)
+plt.ylim(-12, 12)
 
 plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
 
@@ -237,12 +184,14 @@ plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 
-ax.plot(points[:, 0], points[:, 1], points[:, 2], 'bo')
-# ax.plot(g[:, 0], g[:, 1], g[:, 2], 'go')
+N = 200
+# ax.plot(orientation[:N, 0], orientation[:N, 1], orientation[:N, 2], 'bo')
+ax.plot(g[:, 0], g[:, 1], g[:, 2], 'go')
+# ax.plot(qs[:, 0], qs[:, 1], qs[:, 2], 'go')
 
-ax.set_xlim(-1.5, 1.5)
-ax.set_ylim(-1.5, 1.5)
-ax.set_zlim(-1.5, 1.5)
+# ax.set_xlim(-1.5, 1.5)
+# ax.set_ylim(-1.5, 1.5)
+# ax.set_zlim(-1.5, 1.5)
 ax.set_xlabel('X axis')
 ax.set_ylabel('Y axis')
 ax.set_zlabel('Z axis')
