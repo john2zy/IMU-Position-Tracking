@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.linalg import norm
 
 dt = 0
 
@@ -57,15 +58,16 @@ def Hessian(q, gn, mn):
 
 def exp_q(eta):
     '''R3 -> R4 mapping for linearization of quatronion representation'''
-    return np.vstack((np.array([[1]]), eta))
+    eta_norm = norm(eta)
+    return np.vstack((np.cos(eta_norm), eta / eta_norm * np.sin(eta_norm)))
 
 
 def quad_mul(p, q):
     '''quatronion multiplication'''
-    qv, qc = quad_split(q)
+    pv, pc = quad_split(p)
 
-    pl1 = np.hstack((qc, -qv.T))
-    pl2 = np.hstack((qv, qc * I(3) + skew(qv)))
+    pl1 = np.hstack((pc, -pv.T))
+    pl2 = np.hstack((pv, pc * I(3) + skew(pv)))
     pl = np.vstack((pl1, pl2))
     return pl @ q
 
