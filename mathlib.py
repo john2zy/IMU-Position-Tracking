@@ -1,87 +1,108 @@
 import numpy as np
 from numpy.linalg import norm
-
-dt = 0
-
-
-def setDT(DT):
-    global dt
-    dt = DT
-
+import scipy.signal
 
 def I(n):
-    '''unit matrix'''
-    return np.diag(list((1 for _ in range(n))))
+    '''
+    unit matrix
+    just making its name prettier than np.eye
+    '''
+    return np.eye(n)
 
 
-def skew(x):
+def Normalized(x):
+    return x / np.linalg.norm(x)
+
+
+def Skew(x):
     '''
     takes in a 3d column vector
-    returns its skew-symmetric matrix
+    returns its Skew-symmetric matrix
     '''
 
     x = x.T[0]
     return np.array([[0, -x[2], x[1]], [x[2], 0, -x[0]], [-x[1], x[0], 0]])
 
 
-def quad_split(q):
-    '''split q into vector part and real part'''
-    return q[1:4, :], np.array([q[0, :]])
-
-
-def R(q):
-    qv, qc = quad_split(q)
-    tmp1 = (qc**2 - qv.T @ qv) * I(3)
-    tmp2 = -2 * qc * skew(qv)
-    tmp3 = 2 * qv @ qv.T
-    return tmp1 + tmp2 + tmp3
-
-
-# def R(q):
-#     '''
-#     rotation transformation matrix
-#     nav frame to body frame as q is expected to be q^nb
-#     R(q) @ x to rotate x
-#     '''
-
-#     qv, qc = quad_split(q)
-
-#     return qv @ qv.T + qc**2 * I(3) + 2 * qc * skew(qv) + skew(qv)**2
-
-
-def Hessian(q, gn, mn):
+def Rotate(q):
     '''
-    hessian matrix
+    rotation transformation matrix
+    nav frame to body frame as q is expected to be q^nb
+    R(q) @ x to rotate x
     '''
-    return np.vstack((-R(q) @ skew(gn), R(q) @ skew(mn)))
+    
+    qv = q[1:4, :]
+    qc = q[0]
+    return (qc**2 - qv.T @ qv) * I(3) - 2*qc * Skew(qv) + 2*qv @ qv.T
 
 
-def exp_q(eta):
-    '''R3 -> R4 mapping for linearization of quatronion representation'''
-    eta_norm = norm(eta)
-    return np.vstack((np.cos(eta_norm), eta / eta_norm * np.sin(eta_norm)))
+def F(q, wt, dt):
+    '''state transfer matrix'''
+    
+    w = wt.T[0]
+    Omega = np.array([
+        [0, -w[0], -w[1], -w[2]],
+        [w[0], 0, w[2], -w[1]],
+        [w[1], -w[2], 0, w[0]],
+        [w[2], w[1], -w[0], 0]
+    ])
+    
+    return I(4) + 0.5 * dt * Omega
+    
+
+def G(q):
+    '''idk what its called '''
+    
+    q = q.T[0]
+    return 0.5 * np.array([
+        [-q[1], -q[2], -q[3]],
+        [q[0], -q[3], q[2]],
+        [q[3], q[0], -q[1]],
+        [-q[2], q[1], q[0]]
+    ])
 
 
-def quad_mul(p, q):
-    '''quatronion multiplication'''
-    pv, pc = quad_split(p)
+def H_helper(q, vector):
+    # just for convenience
+    x = vector.T[0][0]
+    y = vector.T[0][1]
+    z = vector.T[0][2]
+    q0 = q.T[0][0]
+    q1 = q.T[0][1]
+    q2 = q.T[0][2]
+    q3 = q.T[0][3]
+    
+    h = np.array([
+        [q0*x - q3*y + q2*z, q1*x + q2*y + q3*z, -q2*x + q1*y + q0*z, -q3*x - q0*y + q1*z],
+        [q3*x + q0*y - q1*z, q2*x - q1*y - q0*z, q1*x + q2*y + q3*z, q0*x - q3*y + q2*z],
+        [-q2*x + q1*y +q0*z, q3*x + q0*y - q1*z, -q0*x + q3*y - q2*z, q1*x + q2*y + q3*z]
+    ])
+    return 2 * h
 
-    pl1 = np.hstack((pc, -pv.T))
-    pl2 = np.hstack((pv, pc * I(3) + skew(pv)))
-    pl = np.vstack((pl1, pl2))
-    return pl @ q
+    
+def H(q, gn, mn):
+    '''
+    Measurement matrix
+    '''
 
+    H1 = H_helper(q, gn)
+    H2 = H_helper(q, mn)
+    return np.vstack((-H1, H2))
 
-def F(q, at):
-    '''state transfer matrix for position and velocity'''
-
-    tmp = skew(R(q) @ at)
-    r1 = np.hstack((I(3), dt * I(3), -0.5 * dt**2 * tmp))
-    r2 = np.hstack((np.zeros((3, 1)), I(3), -dt * tmp))
-    r3 = np.hstack((np.zeros((3, 1)), np.zeros((3, 3)), I(3)))
-
-    return np.hstack((r1, r2, r3))
-
-
-# q = np.array([[1, 0, 0, 0]]).T
-# quad_mul(q, q)
+    
+def Filt_signal(data, dt=0.01, wn=10):
+    '''
+    uses a 2nd order butterworth filter
+    @param dt: sampling time
+    @param wn: critical frequency
+    '''
+    res = []
+    
+    
+    n, s = scipy.signal.butter(2, wn, fs=1/dt, btype='lowpass')
+    for d in data:
+        d0 = scipy.signal.filtfilt(n, s, d[:, 0])[:, np.newaxis]
+        d1 = scipy.signal.filtfilt(n, s, d[:, 1])[:, np.newaxis]
+        d2 = scipy.signal.filtfilt(n, s, d[:, 2])[:, np.newaxis]
+        res.append(np.hstack((d0, d1, d2)))
+    return res
