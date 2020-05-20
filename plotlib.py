@@ -1,56 +1,18 @@
 import matplotlib.pyplot as plt
 
 def plot_signal(a, a_filtered, w, w_filtered, m):
-    '''
-    a dirty warpper to make main notebook cleaner
-    '''
+    f, ax = plt.subplots(ncols=3, nrows=3)
+    plot_3([a, a_filtered], ax=ax[:, 0])
+    plot_3([w, w_filtered], ax=ax[:, 1])
+    plot_3([m], ax=ax[:, 2])
+    ax[0, 0].set_ylabel('x')
+    ax[1, 0].set_ylabel('y')
+    ax[2, 0].set_ylabel('z')
+    ax[2, 0].set_xlabel('a')
+    ax[2, 1].set_xlabel('$\omega$')
+    ax[2, 2].set_xlabel('m')
     
-    # plot acc and angular velocity
-    fig, ax = plt.subplots(nrows=3, ncols=3)
-    ax[0, 0].plot(a[:, 0], label='$a_x$')
-    ax[0, 0].plot(a_filtered[: ,0], label='Filtered $a_x$')
-    ax[1, 0].plot(a[:, 1], label='$a_y$')
-    ax[1, 0].plot(a_filtered[: ,1], label='Filtered $a_y$')
-    ax[2, 0].plot(a[:, 2], label='$a_z$')
-    ax[2, 0].plot(a_filtered[: ,2], label='Filtered $a_z$')
-
-    ax[0, 1].plot(w[:, 0], label='$w_x$')
-    ax[0, 1].plot(w_filtered[: ,0], label='Filtered $w_x$')
-    ax[1, 1].plot(w[:, 1], label='$w_y$')
-    ax[1, 1].plot(w_filtered[: ,1], label='Filtered $w_x$')
-    ax[2, 1].plot(w[:, 2], label='$w_z$')
-    ax[2, 1].plot(w_filtered[: ,2], label='Filtered $w_x$')
-
-    ax[0, 2].plot(m[:, 0], label='$m_x$')
-    ax[1, 2].plot(m[:, 1], label='$m_y$')
-    ax[2, 2].plot(m[:, 2], label='$m_z$')
-
-    # for i in range(3):
-    #     for j in range(3):
-    #         ax[i, j].legend(loc='upper left')
-
     plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
-    plt.show()
-    
-    
-def plot3D_g_and_mag(gn, mn):
-    '''
-    plot initial gravity and magnectic field direction
-    '''
-    
-    g_fig = plt.figure()
-    ax = g_fig.add_subplot(111, projection='3d')
-
-    ax.set_xlim(-12, 12)
-    ax.set_ylim(-12, 12)
-    ax.set_zlim(-12, 12)
-    ax.set_xlabel('X axis')
-    ax.set_ylabel('Y axis')
-    ax.set_zlabel('Z axis')
-    ax.plot(gn[0], gn[1], gn[2], 'o')
-    ax.plot(mn[0], mn[1], mn[2], 'o')
-    ax.plot([0], [0], [0], 'ro')
-
     plt.show()
     
     
@@ -60,49 +22,80 @@ def plot_g_and_acc(g, ab):
     '''
     
     fig, ax = plt.subplots(nrows=1, ncols=3)
-
-    ax[0].plot(g[:, 0], 'r-', label='$g_x$')
-    ax[0].plot(ab[:, 0], label="$a^b_x$")
-    ax[0].legend(loc='upper left')
-    ax[0].set_ylim(-12, 12)
-
-    ax[1].plot(g[:, 1], 'g-', label='$g_y$')
-    ax[1].plot(ab[:, 1], label="$a^b_y$")
-    ax[1].legend(loc='upper left')
-    ax[1].set_ylim(-12, 12)
-
-    ax[2].plot(g[:, 2], 'b-', label='$g_z$')
-    ax[2].plot(ab[:, 2], label="$a^b_z$")
-    ax[2].legend(loc='upper left')
-    ax[2].set_ylim(-12, 12)
-
+    plot_3(
+        [g, ab],
+        ax=ax,
+        lims=[[None, [-12, 12]]] * 3,
+        labels=[['$g_x$', '$g_y$', '$g_z$'], ['$a^b_x$', '$a^b_y$', '$a^b_z$']],
+        show_legend=True
+    )
     plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
     plt.show()
     
     
-def plot_3D(data, lim: dict = {}):
+def plot_3(data, ax=None, lims=None, labels=None, show=False, show_legend=False):
     '''
-    @param data: [[data, label string], ...]
-    @param lim: {'x': [xliml, xlimr], ...}
+    @param data: [ndarray, ...]
+    @param lims: [[[xl, xh], [yl, yh]], ...]
+    @param labels: [[label_string, ...], ...]
+    '''
+    
+    show_flag = False
+    if ax is None:
+        show_flag = True
+        f, ax = plt.subplots(ncols=1, nrows=3)
+    
+    for i in range(3):
+        has_label = False
+        for n in range(len(data)):
+            d = data[n]
+            label = labels[n] if labels is not None else None         
+
+            if label is not None:
+                ax[i].plot(d[:, i], label=label[i])
+                has_label = True
+            else:
+                ax[i].plot(d[:, i])
+
+            lim = lims[i] if lims is not None else None
+            if lim is not None:
+                if lim[0] is not None:
+                    ax[i].set_xlim(lim[0][0], lim[0][1])
+                if lim[1] is not None:
+                    ax[i].set_ylim(lim[1][0], lim[1][1])
+
+        if (has_label is not None) and show_legend:
+            ax[i].legend()
+
+    if show or show_flag:
+        plt.show()
+    
+    
+def plot_3D(data, lim=None):
+    '''
+    @param data: [[data, label_string], ...]
+    @param lim: [[xl, xh], [yl, yh], [zl, zh]]
     '''
     
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
 
     for item in data:
-        name = item[1]
+        label = item[1]
         d = item[0]
-        ax.plot(d[:, 0], d[:, 1], d[:, 2], 'o', label=name)
+        ax.plot(d[:, 0], d[:, 1], d[:, 2], 'o', label=label)
     
-    if lim.get('x') is not None:
-        ax.set_xlim(lim['x'][0], lim['x'][1])
-    if lim.get('y') is not None:
-        ax.set_xlim(lim['y'][0], lim['x'][1])
-    if lim.get('z') is not None:
-        ax.set_xlim(lim['z'][0], lim['x'][1])
-        
+    if lim is not None:
+        if lim[0] is not None:
+            ax.set_xlim(lim[0][0], lim[0][1])
+        if lim[1] is not None:
+            ax.set_ylim(lim[1][0], lim[1][1])
+        if lim[2] is not None:
+            ax.set_zlim(lim[2][0], lim[2][1])
+
     ax.legend()
     ax.set_xlabel('X axis')
     ax.set_ylabel('Y axis')
     ax.set_zlabel('Z axis')
     ax.plot([0], [0], [0], 'ro')
+    plt.show()
