@@ -1,3 +1,6 @@
+# README.html is better
+This is terrible. You can read the html version instead.
+
 # IMU Position Tracking
 3D position tracking based on data from 9 degree of freedom IMU (Accelerometer, Gyroscope and Magnetometer). This currently \omegaorks but \omegaith significant accumulated errors from double integration of acceleration.
 
