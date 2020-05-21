@@ -189,7 +189,7 @@ class PositionEstimator:
         # ---- Residual ----
         Eps = np.vstack((Normalized(at), mt)) - np.vstack((pa, pm))
 
-        # ---- process noise ----
+        # ---- sensor noise ----
         # R = internal error + external error
         Ra = [(self.acc_noise / np.linalg.norm(at))**2 +
               (1 - self.g0 / np.linalg.norm(at))**2] * 3
