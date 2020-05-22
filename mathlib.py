@@ -86,7 +86,7 @@ def H(q, gn, mn):
     return np.vstack((-H1, H2))
 
 
-def Filt_signal(data, dt=0.01, wn=10):
+def Filt_signal(data, dt=0.01, wn=10, btype='lowpass'):
     '''
     filter all data at once
     uses a 2nd order butterworth filter provided by scipy
@@ -96,7 +96,7 @@ def Filt_signal(data, dt=0.01, wn=10):
     '''
     
     res = []
-    n, s = scipy.signal.butter(2, wn, fs=1 / dt, btype='lowpass')
+    n, s = scipy.signal.butter(1, wn, fs=1 / dt, btype=btype)
     for d in data:
         d0 = scipy.signal.filtfilt(n, s, d[:, 0])[:, np.newaxis]
         d1 = scipy.signal.filtfilt(n, s, d[:, 1])[:, np.newaxis]

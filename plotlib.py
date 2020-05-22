@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 
+# plt.style.use('fivethirtyeight')
+
 def plot_signal(al: list, wl: list, ml: list):
     f, ax = plt.subplots(ncols=3, nrows=3)
     plot_3(al, ax=ax[:, 0])
@@ -11,10 +13,10 @@ def plot_signal(al: list, wl: list, ml: list):
     ax[1, 0].set_ylabel('y')
     ax[2, 0].set_ylabel('z')
     ax[2, 0].set_xlabel('a')
-    ax[2, 1].set_xlabel('$\omega$')
+    ax[2, 1].set_xlabel(r'$\omega$')
     ax[2, 2].set_xlabel('m')
 
-    plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
+    # plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
     plt.show()
 
 
@@ -30,7 +32,6 @@ def plot_g_and_acc(g, ab):
            labels=[['$g_x$', '$g_y$', '$g_z$'],
                    ['$a^b_x$', '$a^b_y$', '$a^b_z$']],
            show_legend=True)
-    plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
     plt.show()
 
 
@@ -51,40 +52,46 @@ def plot_3(data,
         show_flag = True
         f, ax = plt.subplots(ncols=1, nrows=3)
 
-    for i in range(3):
+    for axel in range(3):
         has_label = False
         for n in range(len(data)):
             d = data[n]
             label = labels[n] if labels is not None else None
 
             if label is not None:
-                ax[i].plot(d[:, i], label=label[i])
+                ax[axel].plot(d[:, axel], label=label[axel])
                 has_label = True
             else:
-                ax[i].plot(d[:, i])
+                ax[axel].plot(d[:, axel])
 
-            lim = lims[i] if lims is not None else None
+            lim = lims[axel] if lims is not None else None
             if lim is not None:
                 if lim[0] is not None:
-                    ax[i].set_xlim(lim[0][0], lim[0][1])
+                    ax[axel].set_xlim(lim[0][0], lim[0][1])
                 if lim[1] is not None:
-                    ax[i].set_ylim(lim[1][0], lim[1][1])
+                    ax[axel].set_ylim(lim[1][0], lim[1][1])
 
         if (has_label is not None) and show_legend:
-            ax[i].legend()
+            ax[axel].legend()
+        ax[axel].grid(True)
 
+    plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
+    
     if show or show_flag:
         plt.show()
+    else:
+        return ax
 
 
-def plot_3D(data, lim=None):
+def plot_3D(data, lim=None, ax=None):
     '''
     @param data: [[data, label_string], ...]
     @param lim: [[xl, xh], [yl, yh], [zl, zh]]
     '''
 
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
+    if ax is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
 
     for item in data:
         label = item[1]
@@ -105,3 +112,6 @@ def plot_3D(data, lim=None):
     ax.set_zlabel('Z axis')
     ax.plot([0], [0], [0], 'ro')
     plt.show()
+    
+def plot_3D_realtime():
+    pass
