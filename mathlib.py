@@ -86,20 +86,18 @@ def H(q, gn, mn):
     return np.vstack((-H1, H2))
 
 
-def Filt_signal(data, dt=0.01, wn=10, btype='lowpass'):
+def Filt_signal(data, dt=0.01, wn=10, btype='lowpass', order=1):
     '''
     filter all data at once
-    uses a 2nd order butterworth filter provided by scipy
+    uses butterworth filter of scipy
     @param data: [...]
     @param dt: sampling time
     @param wn: critical frequency
     '''
     
     res = []
-    n, s = scipy.signal.butter(1, wn, fs=1 / dt, btype=btype)
+    n, s = scipy.signal.butter(order, wn, fs=1 / dt, btype=btype)
     for d in data:
-        d0 = scipy.signal.filtfilt(n, s, d[:, 0])[:, np.newaxis]
-        d1 = scipy.signal.filtfilt(n, s, d[:, 1])[:, np.newaxis]
-        d2 = scipy.signal.filtfilt(n, s, d[:, 2])[:, np.newaxis]
-        res.append(np.hstack((d0, d1, d2)))
+        d = scipy.signal.filtfilt(n, s, d, axis=0)
+        res.append(d)
     return res
