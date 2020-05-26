@@ -1,160 +1,94 @@
 import numpy as np
-import numpy.linalg
+from numpy.linalg import inv, norm
 
 import data_receiver
 from mathlib import *
 from plotlib import *
-from butter import *
 
 
-class PositionEstimator:
+class IMUTracker:
 
-    def __init__(self,
-                 sampling,
-                 tinit=0.5,
-                 gyro_noise=2e-4,
-                 acc_noise=2e-3,
-                 mag_noise=2e-3,
-                 lowpass_filter_cutoff=10,
-                 highpass_filter_cutoff=1e-4,
-                 order={
-                     'w': 1,
-                     'a': 2,
-                     'm': 3
-                 }):
+    def __init__(self, sampling, tinit=0.5, data_order={'w': 1, 'a': 2, 'm': 3}):
         '''
         @param sampling: sampling rate of the IMU, in Hz
         @param tinit: initialization time where the device is expected to be stay still, in second
-        @param gyro_noise: gyroscope measurement noise, it's expected to be low
-        @param acc_noise: accelerometer measurement noise, it should be higher than that of gyroscope noise
-        @param mag_noise: magnetometer measurement noise
-        @param filter_cutoff: cutoff frequency for the lowpass filter, in Hz
-        @param order: specify the order of data in the data array
+        @param data_order: specify the order of data in the data array
         '''
 
         super().__init__()
-        # parameters
+        # ---- parameters ----
         self.sampling = sampling
         self.dt = 1 / sampling    # second
         self.tinit = tinit    # second
-        self.gyro_noise = gyro_noise
-        self.acc_noise = acc_noise
-        self.mag_noise = mag_noise
-        self.lowpass_filter_cutoff = lowpass_filter_cutoff
-        self.highpass_filter_cutoff = highpass_filter_cutoff
-        self.order = order
+        self.data_order = data_order
 
-        # helpers
+        # ---- helpers ----
         idx = {1: [0, 3], 2: [3, 6], 3: [6, 9]}
-        self.widx = idx[self.order['w']]
-        self.aidx = idx[self.order['a']]
-        self.midx = idx[self.order['m']]
-        self.initialized = False    # flag
+        self._widx = idx[data_order['w']]
+        self._aidx = idx[data_order['a']]
+        self._midx = idx[data_order['m']]
 
-        # state variables
-        self.P = 1e-8 * I(4)    # state covariance matrix
-        self.q = np.array([[1, 0, 0, 0]]).T    # quaternion state
-        self.p = np.zeros((3, 1))    # position stae
-        self.v = np.zeros((3, 1))    # velocity state
-        self.filtered_v = np.zeros((3, 1))    # velocity state
-
-        # orientation state: [x, y, z] basis in colunm vectors.
-        # this assumes the initial body frame is navigation frame.
-        self.ori = I(3)
-
-        # data recordings
-        self.a_filtered = []
-        self.w_filtered = []
-        self.m_filtered = []
-        self.veclocities = []
-        self.filtered_veclocities = []
-        self.g = []    # body frame gravity estimations
-        self.abody = []    # body frame acceleration estimations
-        # self.positions = []    # need to add recording in send()
-        # self.orientations = []    # need to add recording in send()
-
-        # filters
-        # lowpass for sensor data to remove noise
-        self.lpfilters = list((Butter(btype='lowpass',
-                                      cutoff=self.lowpass_filter_cutoff,
-                                      sampling=self.sampling) for _ in range(9)))
-
-        # highpass for velocity estimation to remove drift
-        self.hpfilters = list((Butter(btype='highpass',
-                                      cutoff=self.highpass_filter_cutoff,
-                                      sampling=self.sampling) for _ in range(6)))
-
-    def Initialize(self, data, cut1=10, cut2=10):
+    def attitudeTrack(self, data, cut1=10, cut2=10):
         '''
-        @param data: (n, 9) ndarray
-        @param cut1, cut2: the number of the first and last few readings to discard, becuase they are sometimes inaccurate
+        Removes gravity from acceleration data and transform it into navitgaion frame.
+        Also tracks device's orientation.
+        
+        @param data: (,9) ndarray
+        @param cut1, cut2: cut the first and last few data to avoid potential corrupted data
+
+        Return: (acc, orientation)
         '''
+
+        # ------------------------------- #
+        # ---- Initialization ----
+        # ------------------------------- #
 
         # discard the first and last few readings
         # for some reason they fluctuate a lot
-        w = data[cut1:-cut2, self.widx[0]:self.widx[1]]
-        a = data[cut1:-cut2, self.aidx[0]:self.aidx[1]]
-        m = data[cut1:-cut2, self.midx[0]:self.midx[1]]
+        w = data[cut1:-cut2, self._widx[0]:self._widx[1]]
+        a = data[cut1:-cut2, self._aidx[0]:self._aidx[1]]
+        m = data[cut1:-cut2, self._midx[0]:self._midx[1]]
 
-        if (np.shape(w)[0] < self.tinit // self.dt):
-            raise Exception("not enough data for intialization")
-
-        # ---- gyro bias ----
-        self.gyro_bias = w.mean(axis=0)
+        init_idx = int(self.tinit / self.dt)
 
         # ---- gravity ----
-        self.gn = -a.mean(axis=0)
-        self.gn = self.gn[:, np.newaxis]
+        gn = -a[:init_idx].mean(axis=0)
+        gn = gn[:, np.newaxis]
         # save the initial magnitude of gravity
-        self.g0 = np.linalg.norm(self.gn)
+        g0 = np.linalg.norm(gn)
 
         # ---- magnetic field ----
-        self.mn = m.mean(axis=0)
+        mn = m[:init_idx].mean(axis=0)
         # magnitude is not important
-        self.mn = Normalized(self.mn)[:, np.newaxis]
+        mn = Normalized(mn)[:, np.newaxis]
 
         # ---- compute noise covariance ----
-        # self.wvar = w.var(axis=0)
-        # self.avar = a.var(axis=0)
-        # self.mvar = m.var(axis=0)
-        # print("angular variance: ", self.wvar)
-        # print("acc variance: ", self.avar)
-        # print("mag variance: ", self.mvar)
-        # if self.wvar > 0.5 or self.avar > 0.5 or self.mvar > 0.5:
-        #     raise Exception(
-        #         "variance is too high, please don't move the device during initialization"
-        #     )
+        avar = a[:init_idx].var(axis=0)
+        wvar = w[:init_idx].var(axis=0)
+        mvar = m[:init_idx].var(axis=0)
+        print('acc var: ', avar, ', ', np.linalg.norm(avar))
+        print('ang var: ', wvar, ', ', np.linalg.norm(wvar))
+        print('mag var: ', mvar, ', ', np.linalg.norm(mvar))
 
-        # ---- initialize filters as well ----
-        for i in range(3):
-            # send() receives a list and returns a list
-            self.lpfilters[i].send(w[:, i].tolist())
-            self.lpfilters[i + 3].send(a[:, i].tolist())
-            self.lpfilters[i + 6].send(m[:, i].tolist())
+        # ---- cut initialization data ----
+        w = w[init_idx - 1:] - w[:init_idx].mean(axis=0)
+        a = a[init_idx:]
+        m = m[init_idx:]
+        sample_number = np.shape(a)[0]
 
-        self.initialized = True
+        # ---- define sensor noise ----
+        gyro_noise = 10 * np.linalg.norm(wvar)
+        acc_noise = 10 * np.linalg.norm(avar)
+        mag_noise = 10 * np.linalg.norm(mvar)
 
-    def Send(self, data):
-        '''
-        @param data: (,9) ndarray
-        '''
+        # ---- data container ----
+        a_nav = []
+        orientations = []
 
-        if not self.initialized:
-            raise Exception("please initialize first")
-
-        w = data[self.widx[0]:self.widx[1]] - self.gyro_bias
-        a = data[self.aidx[0]:self.aidx[1]]
-        m = data[self.midx[0]:self.midx[1]]
-
-        # ---- filter data ----
-        w_filtered_t = []
-        a_filtered_t = []
-        m_filtered_t = []
-        for i in range(3):
-            # send() receives a list and returns a list
-            w_filtered_t.append(self.lpfilters[i].send([w[i]])[0])
-            a_filtered_t.append(self.lpfilters[i + 3].send([a[i]])[0])
-            m_filtered_t.append(self.lpfilters[i + 6].send([m[i]])[0])
+        # ---- states and covariance matrix ----
+        P = 1e-8 * I(4)    # state covariance matrix
+        q = np.array([[1, 0, 0, 0]]).T    # quaternion state
+        init_ori = -gn / np.linalg.norm(gn)    # initial orientation
 
         # ------------------------------- #
         # ---- Extended Kalman Filter ----
@@ -162,165 +96,211 @@ class PositionEstimator:
 
         # all vectors are column vectors
 
-        # ------------------------------- #
-        # ---- 0. Data Preparation ----
-        # ------------------------------- #
+        t = 0
+        while t < sample_number:
 
-        # -- uncomment to use unfiltered data -- #
-        # wt = w[:, np.newaxis]
-        # at = a[:, np.newaxis]
-        # mt = Normalized(m[:, np.newaxis])
+            # ------------------------------- #
+            # ---- 0. Data Preparation ----
+            # ------------------------------- #
 
-        wt = np.array([w_filtered_t]).T
-        at = np.array([a_filtered_t]).T
-        mt = Normalized(np.array([m_filtered_t]).T)
+            wt = w[t, np.newaxis].T
+            at = a[t, np.newaxis].T
+            mt = Normalized(m[t, np.newaxis].T)
 
-        # ------------------------------- #
-        # ---- 1. Propagation ----
-        # ------------------------------- #
+            # ------------------------------- #
+            # ---- 1. Propagation ----
+            # ------------------------------- #
 
-        Ft = F(self.q, wt, self.dt)
-        Gt = G(self.q)
-        Q = (self.gyro_noise * self.dt)**2 * Gt @ Gt.T
+            Ft = F(q, wt, self.dt)
+            Gt = G(q)
+            Q = (gyro_noise * self.dt)**2 * Gt @ Gt.T
 
-        self.q = Normalized(Ft @ self.q)
-        self.P = Ft @ self.P @ Ft.T + Q
+            q = Normalized(Ft @ q)
+            P = Ft @ P @ Ft.T + Q
 
-        # ------------------------------- #
-        # ---- 2. Measurement Update ----
-        # ------------------------------- #
+            # ------------------------------- #
+            # ---- 2. Measurement Update ----
+            # ------------------------------- #
 
-        # Use normalized measurements to reduce error!
+            # Use normalized measurements to reduce error!
 
-        # ---- acc and mag prediction ----
-        pa = Normalized(-Rotate(self.q) @ self.gn)
-        pm = Normalized(Rotate(self.q) @ self.mn)
+            # ---- acc and mag prediction ----
+            pa = Normalized(-Rotate(q) @ gn)
+            pm = Normalized(Rotate(q) @ mn)
 
-        # ---- Residual ----
-        Eps = np.vstack((Normalized(at), mt)) - np.vstack((pa, pm))
+            # ---- residual ----
+            Eps = np.vstack((Normalized(at), mt)) - np.vstack((pa, pm))
 
-        # ---- sensor noise ----
-        # R = internal error + external error
-        Ra = [(self.acc_noise / np.linalg.norm(at))**2 + (1 - self.g0 / np.linalg.norm(at))**2] * 3
-        Rm = [self.mag_noise**2] * 3
-        R = np.diag(Ra + Rm)
+            # ---- sensor noise ----
+            # R = internal error + external error
+            Ra = [(acc_noise / np.linalg.norm(at))**2 + (1 - g0 / np.linalg.norm(at))**2] * 3
+            Rm = [mag_noise**2] * 3
+            R = np.diag(Ra + Rm)
 
-        # ---- Kalman Gain ----
-        Ht = H(self.q, self.gn, self.mn)
-        S = Ht @ self.P @ Ht.T + R
-        K = self.P @ Ht.T @ np.linalg.inv(S)
+            # ---- kalman gain ----
+            Ht = H(q, gn, mn)
+            S = Ht @ P @ Ht.T + R
+            K = P @ Ht.T @ np.linalg.inv(S)
 
-        # ---- actual update ----
-        self.q = self.q + K @ Eps
-        self.P = self.P - K @ Ht @ self.P
+            # ---- actual update ----
+            q = q + K @ Eps
+            P = P - K @ Ht @ P
 
-        # ------------------------------- #
-        # ---- 3. Post Correction ----
-        # ------------------------------- #
+            # ------------------------------- #
+            # ---- 3. Post Correction ----
+            # ------------------------------- #
 
-        self.q = Normalized(self.q)
-        self.P = 0.5 * (self.P + self.P.T)    # make sure P is symmertical
+            q = Normalized(q)
+            P = 0.5 * (P + P.T)    # make sure P is symmertical
 
-        # ------------------------------- #
-        # ---- 4. other things ----
-        # ------------------------------- #
+            # ------------------------------- #
+            # ---- 4. other things ----
+            # ------------------------------- #
 
-        # ---- body frame gravity ----
-        gt = Rotate(self.q) @ self.gn
-        gt = self.g0 * Normalized(gt)
+            # ---- navigation frame acceleration ----
+            conj = -I(4)
+            conj[0, 0] = 1
+            an = Rotate(conj @ q) @ at + gn
 
-        # ---- body frame acceleration ----
-        ab = at + gt
+            # ---- navigation frame orientation ----
+            orin = Rotate(conj @ q) @ init_ori
 
-        # ---- velocity ----
-        self.v = self.v + ab * self.dt
-        self.filtered_v = self.filtered_v + ab * self.dt
+            # ---- saving data ----
+            a_nav.append(an.T[0])
+            orientations.append(orin.T[0])
 
-        # ---- position ----
-        self.p = self.p + self.filtered_v * self.dt + 0.5 * ab * self.dt**2
+            t += 1
 
-        # ---- highpass filter to remove drift ----
-        for i in range(3):
-            self.filtered_v[i] = self.hpfilters[i].send(self.filtered_v[i].tolist())
-            self.p[i] = self.hpfilters[i + 3].send(self.p[i].tolist())
+        a_nav = np.array(a_nav)
+        orientations = np.array(orientations)
+        return (a_nav, orientations)
 
-        # ---- orientation ----
-        # conj is used to get a conjugate quaternion,
-        # yes I know, this is terrible
-        conj = -I(4)
-        conj[0, 0] = 1
-        qc = conj @ self.q
-        self.ori = Rotate(qc) @ self.ori
-        # renormalize orientation
-        for i in range(3):
-            self.ori[:, i] = self.ori[:, i] / np.linalg.norm(self.ori[:, i])
+    def removeAccErr(self, a_nav, threshold=0.2, wn=(0.01, 15)):
+        '''
+        Removes drift in acc data assuming that
+        the device stays still during initialization and ending period.
+        The initial and final acc are inferred to be exactly 0.
+        The final acc data output is passed through a bandpass filter to further reduce noise and drift.
+        
+        @param a_nav: acc data, raw output from the kalman filter
+        @param threshold: acc threshold to detect the starting and ending point of motion
+        @param wn: bandpass filter cutoff frequencies
+        
+        Return: corrected and filtered acc data
+        '''
 
-        # ---- saving states ----
-        self.a_filtered.append(a_filtered_t)
-        self.w_filtered.append(w_filtered_t)
-        self.m_filtered.append(m_filtered_t)
+        sample_number = np.shape(a_nav)[0]
+        t_start = 0
+        for t in range(sample_number):
+            at = a_nav[t]
+            if np.linalg.norm(at) > threshold:
+                t_start = t
+                break
 
-        self.g.append(gt.T[0])
-        self.abody.append(ab.T[0])
-        self.filtered_veclocities.append(self.filtered_v.T[0])
-        self.veclocities.append(self.v.T[0])
-        # self.orientations.append(...)
+        t_end = 0
+        for t in range(sample_number - 1, -1, -1):
+            at = a_nav[t]
+            if np.linalg.norm(at - a_nav[-1]) > threshold:
+                t_end = t
+                break
 
-        return self.p.T[0], self.ori
+        an_drift = a_nav[t_end:].mean(axis=0)
+        an_drift_rate = an_drift / (t_end - t_start)
+
+        for i in range(t_end - t_start):
+            a_nav[t_start + i] -= (i + 1) * an_drift_rate
+
+        for i in range(sample_number - t_end):
+            a_nav[t_end + i] -= an_drift
+
+        filtered_a_nav, = Filt_signal([a_nav], dt=self.dt, wn=wn, btype='bandpass')
+        return filtered_a_nav
+
+    def zupt(self, a_nav, threshold):
+        '''
+        Applies Zero Velocity Update(ZUPT) algorithm to acc data.
+        
+        @param a_nav: acc data
+        @param threshold: stationary detection threshold, the more intense the movement is the higher this should be
+
+        Return: velocity data
+        '''
+
+        sample_number = np.shape(a_nav)[0]
+        velocities = []
+        prevt = -1
+        still_phase = False
+
+        v = np.zeros((3, 1))
+        t = 0
+        while t < sample_number:
+            at = a_nav[t, np.newaxis].T
+
+            if np.linalg.norm(at) < threshold:
+                if not still_phase:
+                    predict_v = v + at * self.dt
+
+                    v_drift_rate = predict_v / (t - prevt)
+                    for i in range(t - prevt - 1):
+                        velocities[prevt + 1 + i] -= (i + 1) * v_drift_rate.T[0]
+
+                v = np.zeros((3, 1))
+                prevt = t
+                still_phase = True
+            else:
+                v = v + at * self.dt
+                still_phase = False
+
+            velocities.append(v.T[0])
+            t += 1
+
+        velocities = np.array(velocities)
+        return velocities
+
+    def positionTrack(self, a_nav, velocities):
+        '''
+        Simple integration of acc data and velocity data.
+        
+        @param a_nav: acc data
+        @param velocities: velocity data
+        
+        Return: 3D coordinates in navigation frame
+        '''
+
+        sample_number = np.shape(a_nav)[0]
+        positions = []
+        p = np.array([[0, 0, 0]]).T
+
+        t = 0
+        while t < sample_number:
+            at = a_nav[t, np.newaxis].T
+            vt = velocities[t, np.newaxis].T
+
+            p = p + vt * self.dt + 0.5 * at * self.dt**2
+            positions.append(p.T[0])
+            t += 1
+
+        positions = np.array(positions)
+        return positions
 
 
 def plot_trajectory():
     r = data_receiver.Receiver()
-    estimator = PositionEstimator(100, lowpass_filter_cutoff=10, highpass_filter_cutoff=5e-5)
+    tracker = IMUTracker(sampling=100)
 
-    d = []
-    initdata = []
-    count = 0
-
-    positions = []
-    orientations = []
-
-    print('Listening...')
+    data = []
+    print('listening...')
     for line in r.receive():
-        data = line.split(',')
-        if 0 <= count < 100:
-            initdata.append(data)
-            count += 1
-            continue
-        elif count >= 100:
-            initdata = np.array(initdata, dtype=np.float)
-            estimator.Initialize(initdata)
-            print("Initialization complete...")
-            count = -1
-            continue
+        data.append(line.split(','))
+    data = np.array(data, dtype=np.float)
 
-        d.append(data)
-        data = np.array(data, dtype=np.float)
+    print('calculating...')
+    a_nav, ori= tracker.attitudeTrack(data)
+    a_nav = tracker.removeAccErr(a_nav)
+    v = tracker.zupt(a_nav, threshold=0.5)
+    p = tracker.positionTrack(a_nav, v)
 
-        position, orientation = estimator.Send(data)
-        positions.append(position)
-        orientations.append(orientation)
-
-    estimator.a_filtered = np.array(estimator.a_filtered, dtype=np.float)
-    estimator.w_filtered = np.array(estimator.w_filtered, dtype=np.float)
-    estimator.m_filtered = np.array(estimator.m_filtered, dtype=np.float)
-    d = np.array(d, dtype=np.float)
-    plot_signal([d[:, 3:6], estimator.a_filtered], [d[:, 0:3], estimator.w_filtered],
-                [d[:, 6:9], estimator.m_filtered])
-
-    positions = np.array(positions, dtype=np.float)
-    plot_3D([[positions, "position"]])
-
-    estimator.veclocities = np.array(estimator.veclocities, dtype=np.float)
-    estimator.filtered_veclocities = np.array(estimator.filtered_veclocities, dtype=np.float)
-    plot_3([estimator.veclocities, estimator.filtered_veclocities],
-           labels=[['$v_x$', '$v_y$', '$v_z$'],
-                   ['$filtered v_x$', '$filtered v_y$', '$filtered v_z$']],
-           show_legend=True)
-
-    # estimator.g = np.array(estimator.g, dtype=np.float)
-    # estimator.abody = np.array(estimator.abody, dtype=np.float)
-    # plot_g_and_acc(estimator.g, estimator.abody)
+    plot_3D([[p, 'position']])
 
 
 plot_trajectory()
