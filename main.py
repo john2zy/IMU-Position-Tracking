@@ -8,7 +8,7 @@ from plotlib import *
 
 class IMUTracker:
 
-    def __init__(self, sampling, tinit=1, data_order={'w': 1, 'a': 2, 'm': 3}):
+    def __init__(self, sampling, data_order={'w': 1, 'a': 2, 'm': 3}):
         '''
         @param sampling: sampling rate of the IMU, in Hz
         @param tinit: initialization time where the device is expected to be stay still, in second
@@ -19,7 +19,6 @@ class IMUTracker:
         # ---- parameters ----
         self.sampling = sampling
         self.dt = 1 / sampling    # second
-        self.tinit = tinit    # second
         self.data_order = data_order
 
         # ---- helpers ----
@@ -28,13 +27,58 @@ class IMUTracker:
         self._aidx = idx[data_order['a']]
         self._midx = idx[data_order['m']]
 
-    def attitudeTrack(self, data, cut1=10, cut2=10):
+    def initialize(self, data, noise_coefficient={'w': 100, 'a': 100, 'm': 10}):
+        '''
+        Algorithm initialization
+        
+        @param data: (,9) ndarray
+        @param cut: cut the first few data to avoid potential corrupted data
+        @param noise_coefficient: sensor noise is determined by variance magnitude times this coefficient
+        
+        Return: a list of initialization values used by EKF algorithm: 
+        (gn, g0, mn, gyro_noise, gyro_bias, acc_noise, mag_noise)
+        '''
+
+        # discard the first few readings
+        # for some reason they might fluctuate a lot
+        w = data[:, self._widx[0]:self._widx[1]]
+        a = data[:, self._aidx[0]:self._aidx[1]]
+        m = data[:, self._midx[0]:self._midx[1]]
+
+        # ---- gravity ----
+        gn = -a.mean(axis=0)
+        gn = gn[:, np.newaxis]
+        # save the initial magnitude of gravity
+        g0 = np.linalg.norm(gn)
+
+        # ---- magnetic field ----
+        mn = m.mean(axis=0)
+        # magnitude is not important
+        mn = Normalized(mn)[:, np.newaxis]
+
+        # ---- compute noise covariance ----
+        avar = a.var(axis=0)
+        wvar = w.var(axis=0)
+        mvar = m.var(axis=0)
+        print('acc var: %s, norm: %s' % (avar, np.linalg.norm(avar)))
+        print('ang var: %s, norm: %s' % (wvar, np.linalg.norm(wvar)))
+        print('mag var: %s, norm: %s' % (mvar, np.linalg.norm(mvar)))
+
+        # ---- define sensor noise ----
+        gyro_noise = noise_coefficient['w'] * np.linalg.norm(wvar)
+        gyro_bias = w.mean(axis=0)
+        acc_noise = noise_coefficient['a'] * np.linalg.norm(avar)
+        mag_noise = noise_coefficient['m'] * np.linalg.norm(mvar)
+        return (gn, g0, mn, gyro_noise, gyro_bias, acc_noise, mag_noise)
+
+    def attitudeTrack(self, data, init_list):
         '''
         Removes gravity from acceleration data and transform it into navitgaion frame.
         Also tracks device's orientation.
         
         @param data: (,9) ndarray
-        @param cut1, cut2: cut the first and last few data to avoid potential corrupted data
+        @param list: initialization values for EKF algorithm: 
+        (gn, g0, mn, gyro_noise, gyro_bias, acc_noise, mag_noise)
 
         Return: (acc, orientation)
         '''
@@ -42,44 +86,11 @@ class IMUTracker:
         # ------------------------------- #
         # ---- Initialization ----
         # ------------------------------- #
-
-        # discard the first and last few readings
-        # for some reason they fluctuate a lot
-        w = data[cut1:-cut2, self._widx[0]:self._widx[1]]
-        a = data[cut1:-cut2, self._aidx[0]:self._aidx[1]]
-        m = data[cut1:-cut2, self._midx[0]:self._midx[1]]
-
-        init_idx = int(self.tinit / self.dt)
-
-        # ---- gravity ----
-        gn = -a[:init_idx].mean(axis=0)
-        gn = gn[:, np.newaxis]
-        # save the initial magnitude of gravity
-        g0 = np.linalg.norm(gn)
-
-        # ---- magnetic field ----
-        mn = m[:init_idx].mean(axis=0)
-        # magnitude is not important
-        mn = Normalized(mn)[:, np.newaxis]
-
-        # ---- compute noise covariance ----
-        avar = a[:init_idx].var(axis=0)
-        wvar = w[:init_idx].var(axis=0)
-        mvar = m[:init_idx].var(axis=0)
-        print('acc var: ', avar, ', ', np.linalg.norm(avar))
-        print('ang var: ', wvar, ', ', np.linalg.norm(wvar))
-        print('mag var: ', mvar, ', ', np.linalg.norm(mvar))
-
-        # ---- cut initialization data ----
-        w = w[init_idx - 1:] - w[:init_idx].mean(axis=0)
-        a = a[init_idx:]
-        m = m[init_idx:]
-        sample_number = np.shape(a)[0]
-
-        # ---- define sensor noise ----
-        gyro_noise = 10 * np.linalg.norm(wvar)
-        acc_noise = 10 * np.linalg.norm(avar)
-        mag_noise = 10 * np.linalg.norm(mvar)
+        gn, g0, mn, gyro_noise, gyro_bias, acc_noise, mag_noise = init_list
+        w = data[:, self._widx[0]:self._widx[1]] - gyro_bias
+        a = data[:, self._aidx[0]:self._aidx[1]]
+        m = data[:, self._midx[0]:self._midx[1]]
+        sample_number = np.shape(data)[0]
 
         # ---- data container ----
         a_nav = []
@@ -175,7 +186,7 @@ class IMUTracker:
         orientations = np.array(orientations)
         return (a_nav, orientations)
 
-    def removeAccErr(self, a_nav, threshold=0.2, wn=(0.01, 15)):
+    def removeAccErr(self, a_nav, threshold=0.2, filter=False, wn=(0.01, 15)):
         '''
         Removes drift in acc data assuming that
         the device stays still during initialization and ending period.
@@ -213,8 +224,11 @@ class IMUTracker:
         for i in range(sample_number - t_end):
             a_nav[t_end + i] -= an_drift
 
-        filtered_a_nav = Filt_signal([a_nav], dt=self.dt, wn=wn, btype='bandpass')[0]
-        return filtered_a_nav
+        if filter:
+            filtered_a_nav = Filt_signal([a_nav], dt=self.dt, wn=wn, btype='bandpass')[0]
+            return filtered_a_nav
+        else:
+            return a_nav
 
     def zupt(self, a_nav, threshold):
         '''
@@ -310,14 +324,19 @@ def receive_data(mode='tcp'):
 
 def plot_trajectory():
     tracker = IMUTracker(sampling=100)
-    data = receive_data('tcp')
+    data = receive_data('file')
 
+    print('initializing...')
+    init_list = tracker.initialize(data[5:30])
+
+    print('--------')
     print('calculating...')
-    a_nav, ori = tracker.attitudeTrack(data)
-    a_nav_filtered = tracker.removeAccErr(a_nav)
+    a_nav, ori = tracker.attitudeTrack(data[30:], init_list)
+
+    a_nav_filtered = tracker.removeAccErr(a_nav, filter=False)
     plot_3([a_nav, a_nav_filtered])
 
-    v = tracker.zupt(a_nav_filtered, threshold=0.5)
+    v = tracker.zupt(a_nav_filtered, threshold=0.2)
     plot_3([v])
 
     p = tracker.positionTrack(a_nav_filtered, v)
@@ -325,4 +344,5 @@ def plot_trajectory():
     plot_3D([[p, 'position']])
 
 
-plot_trajectory()
+if __name__ == '__main__':
+    plot_trajectory()
