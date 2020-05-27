@@ -6,7 +6,7 @@ class Receiver:
     def __init__(self):
         super().__init__()
         self.HOST = ''   # use '' to expose to all networks
-        self.PORT = 2055
+        self.PORT = 20550
 
     def receive(self):
         """Open specified port and return file-like object"""

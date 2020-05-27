@@ -8,7 +8,7 @@ from plotlib import *
 
 class IMUTracker:
 
-    def __init__(self, sampling, tinit=0.5, data_order={'w': 1, 'a': 2, 'm': 3}):
+    def __init__(self, sampling, tinit=1, data_order={'w': 1, 'a': 2, 'm': 3}):
         '''
         @param sampling: sampling rate of the IMU, in Hz
         @param tinit: initialization time where the device is expected to be stay still, in second
@@ -86,7 +86,7 @@ class IMUTracker:
         orientations = []
 
         # ---- states and covariance matrix ----
-        P = 1e-8 * I(4)    # state covariance matrix
+        P = 1e-10 * I(4)    # state covariance matrix
         q = np.array([[1, 0, 0, 0]]).T    # quaternion state
         init_ori = -gn / np.linalg.norm(gn)    # initial orientation
 
@@ -213,7 +213,7 @@ class IMUTracker:
         for i in range(sample_number - t_end):
             a_nav[t_end + i] -= an_drift
 
-        filtered_a_nav, = Filt_signal([a_nav], dt=self.dt, wn=wn, btype='bandpass')
+        filtered_a_nav = Filt_signal([a_nav], dt=self.dt, wn=wn, btype='bandpass')[0]
         return filtered_a_nav
 
     def zupt(self, a_nav, threshold):
@@ -284,21 +284,43 @@ class IMUTracker:
         return positions
 
 
-def plot_trajectory():
-    r = data_receiver.Receiver()
-    tracker = IMUTracker(sampling=100)
-
+def receive_data(mode='tcp'):
     data = []
-    print('listening...')
-    for line in r.receive():
-        data.append(line.split(','))
-    data = np.array(data, dtype=np.float)
+
+    if mode == 'tcp':
+        r = data_receiver.Receiver()
+        file = open('data.txt', 'w')
+        print('listening...')
+        for line in r.receive():
+            file.write(line)
+            data.append(line.split(','))
+        data = np.array(data, dtype=np.float)
+        return data
+
+    if mode == 'file':
+        file = open('data.txt', 'r')
+        for line in file.readlines():
+            data.append(line.split(','))
+        data = np.array(data, dtype=np.float)
+        return data
+
+    else:
+        raise Exception('Invalid mode argument: ', mode)
+
+
+def plot_trajectory():
+    tracker = IMUTracker(sampling=100)
+    data = receive_data('tcp')
 
     print('calculating...')
-    a_nav, ori= tracker.attitudeTrack(data)
-    a_nav = tracker.removeAccErr(a_nav)
-    v = tracker.zupt(a_nav, threshold=0.5)
-    p = tracker.positionTrack(a_nav, v)
+    a_nav, ori = tracker.attitudeTrack(data)
+    a_nav_filtered = tracker.removeAccErr(a_nav)
+    plot_3([a_nav, a_nav_filtered])
+
+    v = tracker.zupt(a_nav_filtered, threshold=0.5)
+    plot_3([v])
+
+    p = tracker.positionTrack(a_nav_filtered, v)
 
     plot_3D([[p, 'position']])
 

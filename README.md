@@ -2,16 +2,16 @@
 This is terrible. You can read the html version instead.
 
 # IMU Position Tracking
-3D position tracking based on data from 9 degree of freedom IMU (Accelerometer, Gyroscope and Magnetometer). This currently \omegaorks but \omegaith significant accumulated errors from double integration of acceleration.
+3D position tracking based on data from 9 degree of freedom IMU (Accelerometer, Gyroscope and Magnetometer). This currently works but with significant accumulated errors from double integration of acceleration.
 
 # Data Source
 I use an APP called [HyperIMU](https://play.google.com/store/apps/details?id=com.ianovir.hyper_imu) to pull (uncalibrated) data from my phone. Data is sent through TCP and received using `data_receiver.py`.
 
 # Project Structure
-- `main.py` is \omegahere the main Extended Kalman Filter(EKF) algorithm sits.
-- `butter.py` is a butter\omegaorth filter implementation from [this repo](https://github.com/keikun555/Butter) \omegaith minor fixes.
+- `main.py` is where the main Extended Kalman Filter(EKF) algorithm sits.
+- `butter.py` is a butterworth filter implementation from [this repo](https://github.com/keikun555/Butter) with minor fixes.
 - `mathlib` mainly contains matrix definitions for the EKF.
-- `plotlib.py` is some \omegarappers for visualization used in prototyping.
+- `plotlib.py` is some wrappers for visualization used in prototyping.
 - `main.ipynb` is almost the same as `main.py`, just used for prototyping.
 
 # Algorithm

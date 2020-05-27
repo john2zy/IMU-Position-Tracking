@@ -2,7 +2,9 @@
     <html>
     <head>
         <meta charset="UTF-8">
-        <title>IMU Position Tracking</title>
+        <title>README.html is better</title>
+        <style>
+</style>
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.2/dist/katex.min.css" integrity="sha384-yFRtMMDnQtDRO8rLpMIKrtPCD5jdktao2TV19YiZYWMDkUR5GQZR/NOVTdquEx1j" crossorigin="anonymous">
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/markdown.css">
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/highlight.css">
@@ -19,18 +21,21 @@
         </style>
         
         <script src="https://cdn.jsdelivr.net/npm/katex-copytex@latest/dist/katex-copytex.min.js"></script>
+        
     </head>
     <body class="vscode-light">
-        <h1 id="imu-position-tracking">IMU Position Tracking</h1>
-<p>3D position tracking based on data from 9 degree of freedom IMU (Accelerometer, Gyroscope and Magnetometer). This currently \omegaorks but \omegaith significant accumulated errors from double integration of acceleration.</p>
+        <h1 id="readmehtml-is-better">README.html is better</h1>
+<p>This is terrible. You can read the html version instead.</p>
+<h1 id="imu-position-tracking">IMU Position Tracking</h1>
+<p>3D position tracking based on data from 9 degree of freedom IMU (Accelerometer, Gyroscope and Magnetometer). This currently works but with significant accumulated errors from double integration of acceleration.</p>
 <h1 id="data-source">Data Source</h1>
 <p>I use an APP called <a href="https://play.google.com/store/apps/details?id=com.ianovir.hyper_imu">HyperIMU</a> to pull (uncalibrated) data from my phone. Data is sent through TCP and received using <code>data_receiver.py</code>.</p>
 <h1 id="project-structure">Project Structure</h1>
 <ul>
-<li><code>main.py</code> is \omegahere the main Extended Kalman Filter(EKF) algorithm sits.</li>
-<li><code>butter.py</code> is a butter\omegaorth filter implementation from <a href="https://github.com/keikun555/Butter">this repo</a> \omegaith minor fixes.</li>
+<li><code>main.py</code> is where the main Extended Kalman Filter(EKF) algorithm sits.</li>
+<li><code>butter.py</code> is a butterworth filter implementation from <a href="https://github.com/keikun555/Butter">this repo</a> with minor fixes.</li>
 <li><code>mathlib</code> mainly contains matrix definitions for the EKF.</li>
-<li><code>plotlib.py</code> is some \omegarappers for visualization used in prototyping.</li>
+<li><code>plotlib.py</code> is some wrappers for visualization used in prototyping.</li>
 <li><code>main.ipynb</code> is almost the same as <code>main.py</code>, just used for prototyping.</li>
 </ul>
 <h1 id="algorithm">Algorithm</h1>
