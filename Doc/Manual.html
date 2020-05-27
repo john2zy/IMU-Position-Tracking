@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>说明</title>
+        <style>
+</style>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.2/dist/katex.min.css" integrity="sha384-yFRtMMDnQtDRO8rLpMIKrtPCD5jdktao2TV19YiZYWMDkUR5GQZR/NOVTdquEx1j" crossorigin="anonymous">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/markdown.css">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/highlight.css">
+        <link href="https://cdn.jsdelivr.net/npm/katex-copytex@latest/dist/katex-copytex.min.css" rel="stylesheet" type="text/css">
+        <style>
+.task-list-item { list-style-type: none; } .task-list-item-checkbox { margin-left: -20px; vertical-align: middle; }
+</style>
+        <style>
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', 'Ubuntu', 'Droid Sans', sans-serif;
+                font-size: 14px;
+                line-height: 1.6;
+            }
+        </style>
+        
+        <script src="https://cdn.jsdelivr.net/npm/katex-copytex@latest/dist/katex-copytex.min.js"></script>
+        
+    </head>
+    <body class="vscode-light">
+        <ul>
+<li><a href="#%E8%AF%B4%E6%98%8E">说明</a>
+<ul>
+<li><a href="#%E4%BE%9D%E8%B5%96%E5%BA%93">依赖库</a></li>
+<li><a href="#%E9%A1%B9%E7%9B%AE%E7%BB%93%E6%9E%84">项目结构</a></li>
+</ul>
+</li>
+<li><a href="#mainpy">main.py</a>
+<ul>
+<li><a href="#%E6%8E%A5%E5%8F%A3">接口</a>
+<ul>
+<li><a href="#imutracker%E7%B1%BB">IMUTracker类</a></li>
+</ul>
+</li>
+<li><a href="#%E4%BD%BF%E7%94%A8">使用</a></li>
+<li><a href="#%E7%A4%BA%E4%BE%8B">示例</a></li>
+<li><a href="#%E6%B5%81%E7%A8%8B%E5%9B%BE">流程图</a></li>
+</ul>
+</li>
+<li><a href="#plotlibpy">plotlib.py</a>
+<ul>
+<li><a href="#%E6%8E%A5%E5%8F%A3-1">接口</a></li>
+<li><a href="#%E7%A4%BA%E4%BE%8B-1">示例</a></li>
+</ul>
+</li>
+</ul>
+<h1 id="说明">说明</h1>
+<h2 id="依赖库">依赖库</h2>
+<ul>
+<li>numpy</li>
+<li>scipy</li>
+<li>matplotlib</li>
+</ul>
+<h2 id="项目结构">项目结构</h2>
+<ul>
+<li><code>main.py</code>：主算法，带有一个从手机接收数据并可视化的示例。每次运行会自动保存数据到<code>data.txt</code>中，<code>receive_data()</code>的参数设为<code>mode='file'</code>即可从文件读取。</li>
+<li><code>plotlib.py</code>：可视化的简单封装。</li>
+<li><code>mathlib.py</code>：矩阵操作和滤波器的封装。</li>
+<li><code>butter.py</code>：实时巴特沃斯滤波器，详情见<a href="https://github.com/keikun555/Butter">这里</a>。目前没有使用。</li>
+<li><code>main.ipynb</code>：开发使用。</li>
+<li><code>/Ref</code>：
+<ul>
+<li><em>Using Inertial Sensors for Position and Orientation Estimation</em>是一个基本教程，包含了卡尔曼滤波的较为详细的描述。</li>
+<li>其它为修正算法相关文献。</li>
+</ul>
+</li>
+</ul>
+<h1 id="mainpy"><a href="http://main.py">main.py</a></h1>
+<h2 id="接口">接口</h2>
+<h3 id="imutracker类">IMUTracker类</h3>
+<ul>
+<li>
+<p><code>__init__(self, sampling, data_order={'w': 1, 'a': 2, 'm': 3})</code></p>
+<ul>
+<li><code>sampling</code>
+<ul>
+<li>采样率，单位：Hz。</li>
+</ul>
+</li>
+<li><code>order</code>
+<ul>
+<li>数据的顺序，角速度为<code>w</code>、加速度为<code>a</code>、磁力计为<code>m</code>，默认为：<code>{'w': 1, 'a': 2, 'm': 3}</code>。</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><code>initialize(self, data, noise_coefficient={'w': 100, 'a': 100, 'm': 10})</code></p>
+<p>返回一个list，包含EKF算法需要的所有初始化值。</p>
+<ul>
+<li><code>data</code>
+<ul>
+<li>传感器数据，<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false">(</mo><mi>n</mi><mo>×</mo><mn>9</mn><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">(n\times 9)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord mathdefault">n</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">9</span><span class="mclose">)</span></span></span></span>numpy数组。</li>
+<li>有时传感器刚开始测量时会产生无用的数据，可能需要预处理去掉明显不符合实际的数据点，如去掉刚开始测量时的前10个点。</li>
+</ul>
+</li>
+<li><code>noise_coefficient</code>
+<ul>
+<li>传感器噪声值包括了实际噪声和测量误差，噪声由初始化数据的方差算出，然后乘上一个系数作为算法中的传感器噪声。</li>
+<li>这个值越大，代表算法越不信任传感器，那么在滤波补偿时就会减小这个传感器的权值。</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><code>attitudeTrack(self, data, init_list)</code></p>
+<p>使用Extended Kalman Filter(EKF) 计算姿态，算法描述在<code>/Doc/Algorithm Description.html</code>。返回地面坐标系下的加速度（去除了重力成分）和设备朝向。</p>
+<ul>
+<li><code>data</code>
+<ul>
+<li>传感器数据，<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false">(</mo><mi>n</mi><mo>×</mo><mn>9</mn><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">(n\times 9)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord mathdefault">n</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">9</span><span class="mclose">)</span></span></span></span>numpy数组。</li>
+</ul>
+</li>
+<li><code>init_list</code>
+<ul>
+<li>初始化值列表，可以直接使用<code>initialize</code>的返回值，也可自定义。</li>
+<li>顺序：
+<ul>
+<li>地面坐标系重力向量</li>
+<li>重力大小</li>
+<li>磁场方向<strong>单位</strong>向量</li>
+<li>陀螺仪噪声</li>
+<li>陀螺仪偏差</li>
+<li>加速度计噪声</li>
+<li>地磁计噪声</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><code>removeAccErr(self, a_nav, threshold=0.2, filter=False, wn=(0.01, 15))</code></p>
+<p>假设设备测量前后都静止，去除地面坐标系加速度的偏差，并通过一个带通滤波器（可选）。返回修正后的加速度数据。</p>
+<ul>
+<li><code>a_nav</code>
+<ul>
+<li>地面坐标系加速度数据，<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false">(</mo><mi>n</mi><mo>×</mo><mn>3</mn><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">(n\times 3)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord mathdefault">n</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">3</span><span class="mclose">)</span></span></span></span>numpy数组。</li>
+</ul>
+</li>
+<li><code>threshold</code>
+<ul>
+<li>检测静止状态的加速度阈值，不建议太低。</li>
+</ul>
+</li>
+<li><code>filter</code>
+<ul>
+<li>滤波开关。</li>
+<li>低通滤波去除毛刺，高通滤波去除直流分量（固定的偏差），但有时滤波会起反作用，应视实际情况使用。</li>
+</ul>
+</li>
+<li><code>wn</code>
+<ul>
+<li>滤波器的截止频率。</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><code>zupt(self, a_nav, threshold)</code></p>
+<p>使用Zero velocity UPdaTe算法来修正速度。返回修正后的速度数据。</p>
+<ul>
+<li><code>a_nav</code>
+<ul>
+<li>地面坐标系加速度数据，<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false">(</mo><mi>n</mi><mo>×</mo><mn>3</mn><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">(n\times 3)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord mathdefault">n</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">3</span><span class="mclose">)</span></span></span></span>numpy数组。</li>
+</ul>
+</li>
+<li><code>threshold</code>
+<ul>
+<li>检测静止状态的加速度阈值，运动越激烈阈值应越高。</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><code>positionTrack(self, a_nav, velocities)</code></p>
+<p>使用加速度和速度进行积分得到位移。返回位移数据。</p>
+<ul>
+<li><code>a_nav</code>
+<ul>
+<li>地面坐标系加速度数据，<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false">(</mo><mi>n</mi><mo>×</mo><mn>3</mn><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">(n\times 3)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord mathdefault">n</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">3</span><span class="mclose">)</span></span></span></span>numpy数组。</li>
+</ul>
+</li>
+<li><code>velocities</code>
+<ul>
+<li>地面坐标系速度数据，<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false">(</mo><mi>n</mi><mo>×</mo><mn>3</mn><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">(n\times 3)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord mathdefault">n</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">3</span><span class="mclose">)</span></span></span></span>numpy数组。</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h2 id="使用">使用</h2>
+<ol>
+<li>初始化<code>IMUTracker</code>类</li>
+<li>将初始化数据输入<code>initialize</code>方法</li>
+<li>将<code>initialize</code>返回的list，同传感器数据一起传入<code>attitudeTrack</code>方法</li>
+<li>使用<code>removeAccErr</code>方法修正<code>attitudeTrack</code>返回的加速度数据</li>
+<li>使用<code>zupt</code>方法计算速度</li>
+<li>使用<code>positionTrack</code>方法对速度和加速度数据进行积分，得到位移</li>
+</ol>
+<h2 id="示例">示例</h2>
+<pre><code class="language-python"><div>data = sensor.getData()
+tracker = IMUTracker(sampling=<span class="hljs-number">100</span>)
+
+<span class="hljs-comment"># init</span>
+init_list = tracker.initialize(data[<span class="hljs-number">5</span>:<span class="hljs-number">30</span>])
+<span class="hljs-comment"># EKF</span>
+a_nav, ori = tracker.attitudeTrack(data[<span class="hljs-number">30</span>:], init_list)
+<span class="hljs-comment"># filter a_nav</span>
+a_nav_filtered = tracker.removeAccErr(a_nav, filter=<span class="hljs-literal">False</span>)
+<span class="hljs-comment"># get velocity</span>
+v = tracker.zupt(a_nav_filtered, threshold=<span class="hljs-number">0.2</span>)
+<span class="hljs-comment"># get position</span>
+p = tracker.positionTrack(a_nav_filtered, v)
+</div></code></pre>
+<h2 id="流程图">流程图</h2>
+<div align=center>
+    <img src="file:///c:\Users\John\Desktop\Repo\IMU tracking\Doc\dataflow.svg" height=600/>
+</div>
+<h1 id="plotlibpy"><a href="http://plotlib.py">plotlib.py</a></h1>
+<h2 id="接口-1">接口</h2>
+<ul>
+<li>
+<p><code>plot_3(data, ax=None, lims=None, labels=None, show=False, show_legend=False)</code></p>
+<p>接受多个<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false">(</mo><mi>n</mi><mo>×</mo><mn>3</mn><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">(n\times 3)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord mathdefault">n</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">3</span><span class="mclose">)</span></span></span></span>的数据，如XYZ方向加速度，将3个分量分别画在3张图中。默认不设置其他参数。返回使用的matplotlib axes对象。</p>
+<ul>
+<li><code>data</code>
+<ul>
+<li>包含数据的列表：<code>[data1, data2, ...]</code>。每个元素都是<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false">(</mo><mi>n</mi><mo>×</mo><mn>3</mn><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">(n\times 3)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord mathdefault">n</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">3</span><span class="mclose">)</span></span></span></span>的numpy数组。</li>
+</ul>
+</li>
+<li><code>ax</code>
+<ul>
+<li>matplotlib axes对象，默认单独创建。</li>
+</ul>
+</li>
+<li><code>lims</code>
+<ul>
+<li>坐标上下限：<code>[[[xl, xh], [yl, yh]], ...]</code>。</li>
+<li>嵌套了3层。</li>
+</ul>
+</li>
+<li><code>labels</code>
+<ul>
+<li>图例所用的标签：<code>[[x_label1, y_label1, z_label1], [x_label2, y_label2, z_label2], ...]</code>。</li>
+<li>与<code>data</code>中数据一一对应。</li>
+</ul>
+</li>
+<li><code>show</code>
+<ul>
+<li>是否调用<code>plt.show()</code>，用处不大可以忽略。</li>
+</ul>
+</li>
+<li><code>show_legend</code>
+<ul>
+<li>是否显示图例，如果不定义标签则显示空图例。</li>
+<li>有时图例会遮挡曲线，所以为了方便，单独定义了这个开关。</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><code>plot_3D(data, lim=None, ax=None)</code></p>
+<p>接受多个<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false">(</mo><mi>n</mi><mo>×</mo><mn>3</mn><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">(n\times 3)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord mathdefault">n</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">3</span><span class="mclose">)</span></span></span></span>的数据，画出3维图像。</p>
+<ul>
+<li><code>data</code>
+<ul>
+<li>包含数据的列表：<code>[[data1, label1], [data2, label2], ...]</code>。</li>
+<li>这里不太一样的是强制要求定义标签。</li>
+</ul>
+</li>
+<li><code>lim</code>
+<ul>
+<li>XYZ轴的上下限：<code>[[xl, xh], [yl, yh], [zl, zh]]</code>。</li>
+<li>单个轴设为<code>None</code>则使用默认值，如：<code>[[xl, xh], [yl, yh], None]</code>。</li>
+</ul>
+</li>
+<li><code>ax</code>
+<ul>
+<li>画图使用的matplotlib axes对象，用户一般不需要设置。</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h2 id="示例-1">示例</h2>
+<p>直接输入数据即可画图：</p>
+<pre><code class="language-python"><div>plot_3([acc1, acc2])
+plot_3D([[position, <span class="hljs-string">'position'</span>], [orientation, <span class="hljs-string">'orientation'</span>]])
+</div></code></pre>
+<p><code>plot_3()</code>默认使用3行布局，也可以使用3列布局：</p>
+<pre><code class="language-python"><div><span class="hljs-keyword">import</span> matplotlib.pyplot <span class="hljs-keyword">as</span> plt
+fig, ax = plt.subplots(nrows=<span class="hljs-number">1</span>, ncols=<span class="hljs-number">3</span>)
+plot_3([acc1, acc2], ax=ax)
+</div></code></pre>
+
+    </body>
+    </html>
