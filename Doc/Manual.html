@@ -291,6 +291,8 @@ p = tracker.positionTrack(a_nav_filtered, v)
 <li>
 <p><code>plot3DAnimated(data, lim=[[-1, 1], [-1, 1], [-1, 1]], label=None, interval=10, show=True, repeat=False)</code></p>
 <p>生成一个3D动画。</p>
+<p>视角调整比较麻烦，见<a href="https://matplotlib.org/mpl_toolkits/mplot3d/api.html#mpl_toolkits.mplot3d.axes3d.Axes3D.view_init">axes3d.view_init</a>。</p>
+<p>如果需要保存动画，则需要ffmpeg库，然后使用<code>ani.save()</code>，见<a href="https://matplotlib.org/gallery/animation/basic_example_writer_sgskip.html">matplotlib文档示例</a>。</p>
 <ul>
 <li><code>data</code>
 <ul>

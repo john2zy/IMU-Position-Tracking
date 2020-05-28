@@ -176,6 +176,10 @@ p = tracker.positionTrack(a_nav_filtered, v)
 
   生成一个3D动画。
 
+  视角调整比较麻烦，见[axes3d.view_init](https://matplotlib.org/mpl_toolkits/mplot3d/api.html#mpl_toolkits.mplot3d.axes3d.Axes3D.view_init)。
+
+  如果需要保存动画，则需要ffmpeg库，然后使用`ani.save()`，见[matplotlib文档示例](https://matplotlib.org/gallery/animation/basic_example_writer_sgskip.html)。
+
   - `data`
     - $(n\times 3)$numpy数组。
   - `lim`
