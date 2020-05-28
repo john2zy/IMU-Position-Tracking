@@ -11,14 +11,14 @@ def I(n):
     return np.eye(n)
 
 
-def Normalized(x):
+def normalized(x):
     try:
         return x / np.linalg.norm(x)
     except:
         return x
 
 
-def Skew(x):
+def skew(x):
     '''
     takes in a 3d column vector
     returns its Skew-symmetric matrix
@@ -28,7 +28,7 @@ def Skew(x):
     return np.array([[0, -x[2], x[1]], [x[2], 0, -x[0]], [-x[1], x[0], 0]])
 
 
-def Rotate(q):
+def rotate(q):
     '''
     rotation transformation matrix
     nav frame to body frame as q is expected to be q^nb
@@ -37,7 +37,7 @@ def Rotate(q):
 
     qv = q[1:4, :]
     qc = q[0]
-    return (qc**2 - qv.T @ qv) * I(3) - 2 * qc * Skew(qv) + 2 * qv @ qv.T
+    return (qc**2 - qv.T @ qv) * I(3) - 2 * qc * skew(qv) + 2 * qv @ qv.T
 
 
 def F(q, wt, dt):
@@ -58,7 +58,7 @@ def G(q):
                            [q[3], q[0], -q[1]], [-q[2], q[1], q[0]]])
 
 
-def H_helper(q, vector):
+def Hhelper(q, vector):
     # just for convenience
     x = vector.T[0][0]
     y = vector.T[0][1]
@@ -81,12 +81,12 @@ def H(q, gn, mn):
     Measurement matrix
     '''
 
-    H1 = H_helper(q, gn)
-    H2 = H_helper(q, mn)
+    H1 = Hhelper(q, gn)
+    H2 = Hhelper(q, mn)
     return np.vstack((-H1, H2))
 
 
-def Filt_signal(data, dt=0.01, wn=10, btype='lowpass', order=1):
+def filtSignal(data, dt=0.01, wn=10, btype='lowpass', order=1):
     '''
     filter all data at once
     uses butterworth filter of scipy

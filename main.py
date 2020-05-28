@@ -54,7 +54,7 @@ class IMUTracker:
         # ---- magnetic field ----
         mn = m.mean(axis=0)
         # magnitude is not important
-        mn = Normalized(mn)[:, np.newaxis]
+        mn = normalized(mn)[:, np.newaxis]
 
         # ---- compute noise covariance ----
         avar = a.var(axis=0)
@@ -116,7 +116,7 @@ class IMUTracker:
 
             wt = w[t, np.newaxis].T
             at = a[t, np.newaxis].T
-            mt = Normalized(m[t, np.newaxis].T)
+            mt = normalized(m[t, np.newaxis].T)
 
             # ------------------------------- #
             # ---- 1. Propagation ----
@@ -126,7 +126,7 @@ class IMUTracker:
             Gt = G(q)
             Q = (gyro_noise * self.dt)**2 * Gt @ Gt.T
 
-            q = Normalized(Ft @ q)
+            q = normalized(Ft @ q)
             P = Ft @ P @ Ft.T + Q
 
             # ------------------------------- #
@@ -136,11 +136,11 @@ class IMUTracker:
             # Use normalized measurements to reduce error!
 
             # ---- acc and mag prediction ----
-            pa = Normalized(-Rotate(q) @ gn)
-            pm = Normalized(Rotate(q) @ mn)
+            pa = normalized(-rotate(q) @ gn)
+            pm = normalized(rotate(q) @ mn)
 
             # ---- residual ----
-            Eps = np.vstack((Normalized(at), mt)) - np.vstack((pa, pm))
+            Eps = np.vstack((normalized(at), mt)) - np.vstack((pa, pm))
 
             # ---- sensor noise ----
             # R = internal error + external error
@@ -161,7 +161,7 @@ class IMUTracker:
             # ---- 3. Post Correction ----
             # ------------------------------- #
 
-            q = Normalized(q)
+            q = normalized(q)
             P = 0.5 * (P + P.T)    # make sure P is symmertical
 
             # ------------------------------- #
@@ -171,10 +171,10 @@ class IMUTracker:
             # ---- navigation frame acceleration ----
             conj = -I(4)
             conj[0, 0] = 1
-            an = Rotate(conj @ q) @ at + gn
+            an = rotate(conj @ q) @ at + gn
 
             # ---- navigation frame orientation ----
-            orin = Rotate(conj @ q) @ init_ori
+            orin = rotate(conj @ q) @ init_ori
 
             # ---- saving data ----
             a_nav.append(an.T[0])
@@ -225,7 +225,7 @@ class IMUTracker:
             a_nav[t_end + i] -= an_drift
 
         if filter:
-            filtered_a_nav = Filt_signal([a_nav], dt=self.dt, wn=wn, btype='bandpass')[0]
+            filtered_a_nav = filtSignal([a_nav], dt=self.dt, wn=wn, btype='bandpass')[0]
             return filtered_a_nav
         else:
             return a_nav
@@ -324,24 +324,37 @@ def receive_data(mode='tcp'):
 
 def plot_trajectory():
     tracker = IMUTracker(sampling=100)
-    data = receive_data('file')
+    data = receive_data('file')    # toggle data source between 'tcp' and 'file' here
 
     print('initializing...')
     init_list = tracker.initialize(data[5:30])
 
     print('--------')
-    print('calculating...')
+    print('processing...')
+    
+    # EKF step
     a_nav, ori = tracker.attitudeTrack(data[30:], init_list)
 
+    # Acceleration correction step
     a_nav_filtered = tracker.removeAccErr(a_nav, filter=False)
-    plot_3([a_nav, a_nav_filtered])
+    # plot3([a_nav, a_nav_filtered])
 
+    # ZUPT step
     v = tracker.zupt(a_nav_filtered, threshold=0.2)
-    plot_3([v])
+    # plot3([v])
 
+    # Integration Step
     p = tracker.positionTrack(a_nav_filtered, v)
-
-    plot_3D([[p, 'position']])
+    # plot3D([[p, 'position']])
+    
+    # make 3D animation
+    xl = np.min(p[:, 0]) - 0.05
+    xh = np.max(p[:, 0]) + 0.05
+    yl = np.min(p[:, 1]) - 0.05
+    yh = np.max(p[:, 1]) + 0.05
+    zl = np.min(p[:, 2]) - 0.05
+    zh = np.max(p[:, 2]) + 0.05
+    plot3DAnimated(p, lim=[[xl, xh], [yl, yh], [zl, zh]], label='position', interval=5)
 
 
 if __name__ == '__main__':

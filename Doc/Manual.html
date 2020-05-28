@@ -227,7 +227,7 @@ p = tracker.positionTrack(a_nav_filtered, v)
 <h2 id="接口-1">接口</h2>
 <ul>
 <li>
-<p><code>plot_3(data, ax=None, lims=None, labels=None, show=False, show_legend=False)</code></p>
+<p><code>plot3(data, ax=None, lims=None, labels=None, show=False, show_legend=False)</code></p>
 <p>接受多个<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false">(</mo><mi>n</mi><mo>×</mo><mn>3</mn><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">(n\times 3)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord mathdefault">n</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">3</span><span class="mclose">)</span></span></span></span>的数据，如XYZ方向加速度，将3个分量分别画在3张图中。默认不设置其他参数。返回使用的matplotlib axes对象。</p>
 <ul>
 <li><code>data</code>
@@ -266,7 +266,7 @@ p = tracker.positionTrack(a_nav_filtered, v)
 </ul>
 </li>
 <li>
-<p><code>plot_3D(data, lim=None, ax=None)</code></p>
+<p><code>plot3D(data, lim=None, ax=None)</code></p>
 <p>接受多个<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false">(</mo><mi>n</mi><mo>×</mo><mn>3</mn><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">(n\times 3)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord mathdefault">n</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">3</span><span class="mclose">)</span></span></span></span>的数据，画出3维图像。</p>
 <ul>
 <li><code>data</code>
@@ -288,16 +288,54 @@ p = tracker.positionTrack(a_nav_filtered, v)
 </li>
 </ul>
 </li>
+<li>
+<p><code>plot3DAnimated(data, lim=[[-1, 1], [-1, 1], [-1, 1]], label=None, interval=10, show=True, repeat=False)</code></p>
+<p>生成一个3D动画。</p>
+<ul>
+<li><code>data</code>
+<ul>
+<li><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false">(</mo><mi>n</mi><mo>×</mo><mn>3</mn><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">(n\times 3)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord mathdefault">n</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">3</span><span class="mclose">)</span></span></span></span>numpy数组。</li>
+</ul>
+</li>
+<li><code>lim</code>
+<ul>
+<li>坐标轴范围。</li>
+<li>这个不会随数据自动设置，最好要手动指定。</li>
+</ul>
+</li>
+<li><code>label</code>
+<ul>
+<li>图例标签，字符串。</li>
+</ul>
+</li>
+<li><code>interval</code>
+<ul>
+<li>帧之间的时长，单位：ms</li>
+</ul>
+</li>
+<li><code>show</code>
+<ul>
+<li>控制是否调用<code>plt.show()</code>。</li>
+<li>如果不调用，则可以多次调用这个函数，在同一张图中画出多条曲线。最后需要手动调用<code>plt.show()</code></li>
+</ul>
+</li>
+<li><code>repeat</code>
+<ul>
+<li>控制动画是否循环。</li>
+</ul>
+</li>
+</ul>
+</li>
 </ul>
 <h2 id="示例-1">示例</h2>
 <p>直接输入数据即可画图：</p>
-<pre><code class="language-python"><div>plot_3([acc1, acc2])
-plot_3D([[position, <span class="hljs-string">'position'</span>], [orientation, <span class="hljs-string">'orientation'</span>]])
+<pre><code class="language-python"><div>plot3([acc1, acc2])
+plot3D([[position, <span class="hljs-string">'position'</span>], [orientation, <span class="hljs-string">'orientation'</span>]])
 </div></code></pre>
-<p><code>plot_3()</code>默认使用3行布局，也可以使用3列布局：</p>
+<p><code>plot3()</code>默认使用3行布局，也可以使用3列布局：</p>
 <pre><code class="language-python"><div><span class="hljs-keyword">import</span> matplotlib.pyplot <span class="hljs-keyword">as</span> plt
 fig, ax = plt.subplots(nrows=<span class="hljs-number">1</span>, ncols=<span class="hljs-number">3</span>)
-plot_3([acc1, acc2], ax=ax)
+plot3([acc1, acc2], ax=ax)
 </div></code></pre>
 
     </body>

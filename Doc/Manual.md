@@ -139,7 +139,7 @@ p = tracker.positionTrack(a_nav_filtered, v)
 # plotlib.py
 
 ## 接口
-- `plot_3(data, ax=None, lims=None, labels=None, show=False, show_legend=False)`
+- `plot3(data, ax=None, lims=None, labels=None, show=False, show_legend=False)`
 
     接受多个$(n\times 3)$的数据，如XYZ方向加速度，将3个分量分别画在3张图中。默认不设置其他参数。返回使用的matplotlib axes对象。
 
@@ -159,7 +159,7 @@ p = tracker.positionTrack(a_nav_filtered, v)
       - 是否显示图例，如果不定义标签则显示空图例。
       - 有时图例会遮挡曲线，所以为了方便，单独定义了这个开关。
 
-- `plot_3D(data, lim=None, ax=None)`
+- `plot3D(data, lim=None, ax=None)`
   
     接受多个$(n\times 3)$的数据，画出3维图像。
 
@@ -172,17 +172,37 @@ p = tracker.positionTrack(a_nav_filtered, v)
   - `ax`
     - 画图使用的matplotlib axes对象，用户一般不需要设置。
 
+- `plot3DAnimated(data, lim=[[-1, 1], [-1, 1], [-1, 1]], label=None, interval=10, show=True, repeat=False)`
+
+  生成一个3D动画。
+
+  - `data`
+    - $(n\times 3)$numpy数组。
+  - `lim`
+    - 坐标轴范围。
+    - 这个不会随数据自动设置，最好要手动指定。
+  - `label`
+    - 图例标签，字符串。
+  - `interval`
+    - 帧之间的时长，单位：ms
+  - `show`
+    - 控制是否调用`plt.show()`。
+    - 如果不调用，则可以多次调用这个函数，在同一张图中画出多条曲线。最后需要手动调用`plt.show()`
+  - `repeat`
+    - 控制动画是否循环。
+
+
 ## 示例
 
 直接输入数据即可画图：
 ```python
-plot_3([acc1, acc2])
-plot_3D([[position, 'position'], [orientation, 'orientation']])
+plot3([acc1, acc2])
+plot3D([[position, 'position'], [orientation, 'orientation']])
 ```
 
-`plot_3()`默认使用3行布局，也可以使用3列布局：
+`plot3()`默认使用3行布局，也可以使用3列布局：
 ```python
 import matplotlib.pyplot as plt
 fig, ax = plt.subplots(nrows=1, ncols=3)
-plot_3([acc1, acc2], ax=ax)
+plot3([acc1, acc2], ax=ax)
 ```
