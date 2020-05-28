@@ -55,6 +55,14 @@
 - `attitudeTrack(self, data, init_list)`
 
     使用Extended Kalman Filter(EKF) 计算姿态，算法描述在`/Doc/Algorithm Description.html`。返回地面坐标系下的加速度（去除了重力成分）和设备朝向。
+    
+    朝向由3个$n\times 3$numpy数组表示，分别是$XYZ$轴的方向向量（单位向量），设备初始状态是：
+    $$\hat{x}=[1,0,0]^T\ \hat{y}=[0,1,0]^T\ \hat{z}=[0,0,1]^T$$
+
+    绕$Z$轴右手方向旋转$90\degree$后：
+    $$\hat{x}=[0,1,0]^T\ \hat{y}=[-1,0,0]^T\ \hat{z}=[0,0,1]^T$$
+
+
 
     - `data`
       - 传感器数据，$(n\times 9)$numpy数组。
@@ -121,7 +129,7 @@ tracker = IMUTracker(sampling=100)
 # init
 init_list = tracker.initialize(data[5:30])
 # EKF
-a_nav, ori = tracker.attitudeTrack(data[30:], init_list)
+a_nav, orix, oriy, oriz = tracker.attitudeTrack(data[30:], init_list)
 # filter a_nav
 a_nav_filtered = tracker.removeAccErr(a_nav, filter=False)
 # get velocity
@@ -141,7 +149,7 @@ p = tracker.positionTrack(a_nav_filtered, v)
 ## 接口
 - `plot3(data, ax=None, lims=None, labels=None, show=False, show_legend=False)`
 
-    接受多个$(n\times 3)$的数据，如XYZ方向加速度，将3个分量分别画在3张图中。默认不设置其他参数。返回使用的matplotlib axes对象。
+    接受多个$(n\times 3)$的数据，如$XYZ$方向加速度，将3个分量分别画在3张图中。默认不设置其他参数。返回使用的matplotlib axes对象。
 
     - `data`
       - 包含数据的列表：`[data1, data2, ...]`。每个元素都是$(n\times 3)$的numpy数组。
@@ -167,7 +175,7 @@ p = tracker.positionTrack(a_nav_filtered, v)
     - 包含数据的列表：`[[data1, label1], [data2, label2], ...]`。
     - 这里不太一样的是强制要求定义标签。
   - `lim`
-    - XYZ轴的上下限：`[[xl, xh], [yl, yh], [zl, zh]]`。
+    - $XYZ$轴的上下限：`[[xl, xh], [yl, yh], [zl, zh]]`。
     - 单个轴设为`None`则使用默认值，如：`[[xl, xh], [yl, yh], None]`。
   - `ax`
     - 画图使用的matplotlib axes对象，用户一般不需要设置。

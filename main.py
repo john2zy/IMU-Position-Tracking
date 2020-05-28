@@ -94,12 +94,14 @@ class IMUTracker:
 
         # ---- data container ----
         a_nav = []
-        orientations = []
+        orix = []
+        oriy = []
+        oriz = []
 
         # ---- states and covariance matrix ----
         P = 1e-10 * I(4)    # state covariance matrix
         q = np.array([[1, 0, 0, 0]]).T    # quaternion state
-        init_ori = -gn / np.linalg.norm(gn)    # initial orientation
+        init_ori = I(3)   # initial orientation
 
         # ------------------------------- #
         # ---- Extended Kalman Filter ----
@@ -178,13 +180,17 @@ class IMUTracker:
 
             # ---- saving data ----
             a_nav.append(an.T[0])
-            orientations.append(orin.T[0])
+            orix.append(orin.T[0, :])
+            oriy.append(orin.T[1, :])
+            oriz.append(orin.T[2, :])
 
             t += 1
 
         a_nav = np.array(a_nav)
-        orientations = np.array(orientations)
-        return (a_nav, orientations)
+        orix = np.array(orix)
+        oriy = np.array(oriy)
+        oriz = np.array(oriz)
+        return (a_nav, orix, oriy, oriz)
 
     def removeAccErr(self, a_nav, threshold=0.2, filter=False, wn=(0.01, 15)):
         '''
@@ -333,7 +339,7 @@ def plot_trajectory():
     print('processing...')
     
     # EKF step
-    a_nav, ori = tracker.attitudeTrack(data[30:], init_list)
+    a_nav, orix, oriy, oriz = tracker.attitudeTrack(data[30:], init_list)
 
     # Acceleration correction step
     a_nav_filtered = tracker.removeAccErr(a_nav, filter=False)
@@ -345,16 +351,16 @@ def plot_trajectory():
 
     # Integration Step
     p = tracker.positionTrack(a_nav_filtered, v)
-    # plot3D([[p, 'position']])
+    plot3D([[p, 'position']])
     
     # make 3D animation
-    xl = np.min(p[:, 0]) - 0.05
-    xh = np.max(p[:, 0]) + 0.05
-    yl = np.min(p[:, 1]) - 0.05
-    yh = np.max(p[:, 1]) + 0.05
-    zl = np.min(p[:, 2]) - 0.05
-    zh = np.max(p[:, 2]) + 0.05
-    plot3DAnimated(p, lim=[[xl, xh], [yl, yh], [zl, zh]], label='position', interval=5)
+    # xl = np.min(p[:, 0]) - 0.05
+    # xh = np.max(p[:, 0]) + 0.05
+    # yl = np.min(p[:, 1]) - 0.05
+    # yh = np.max(p[:, 1]) + 0.05
+    # zl = np.min(p[:, 2]) - 0.05
+    # zh = np.max(p[:, 2]) + 0.05
+    # plot3DAnimated(p, lim=[[xl, xh], [yl, yh], [zl, zh]], label='position', interval=5)
 
 
 if __name__ == '__main__':
