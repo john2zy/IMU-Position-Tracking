@@ -7,8 +7,8 @@
 - `mathlib`: contains matrix definitions for the EKF and a filter helper function.
 - `plotlib.py`: some wrappers for visualization used in prototyping.
 - `main.ipynb`: almost the same as `main.py`, just used for prototyping.
-- `/Ref`: References
-- `/Doc`: an Algorithm description and a manual
+- `/Ref`: Some paper found on the internet that is helpful.
+- `/Doc`: an Algorithm description (you can view it in html as github doesn't support markdown latex extension) and an API documentation in Chinese.
 
 # Data Source
 I use an APP called [HyperIMU](https://play.google.com/store/apps/details?id=com.ianovir.hyper_imu) to pull (uncalibrated) data from my phone. Data is sent through TCP and received using `data_receiver.py`.
